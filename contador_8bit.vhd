@@ -51,31 +51,28 @@ begin
   P57 <= '0';
   -- XXX: pode apagar abaixo.
   EN_DL <= '1';
-  EN_DH <= '0';
 
-  UP <= DINL(0);
-  LOAD <= DINL(1);
-  CLR <= DINL(2);
-  EN <= (not DINL(3)) and (not DINL(4)) and (not DINL(5)) and DINL(6) and DINL(7);
+  -- endereços:
+  -- 0x300 (up)
+  -- 0x301 (down)
+  -- 0x302 (load)
+  -- 0x304 (clear)
+  UP <= (not A(0));
+  LOAD <= A(1);
+  CLR <= A(2);
+  EN <= (not A(3)) and (not A(4)) and (not A(5)) and (not A(6)) and (not A(7)) and A(8) and A(9);
 
   process (CLK8M)
   begin
       if (CLK8M'event and CLK8M = '1' and EN = '1') then
-          if (LOAD = '0') then
-              EN_DL <= '0';
-              EN_DH <= '1';
-              Q <= DINH;
+          if (LOAD = '0') then Q <= DINL;
           elsif (CLR = '0') then Q <= "00000000";
-          elsif (UP = '1') then
-              Q <= Q + "00000001";
-          elsif (UP = '0') then
-              Q <= Q - "00000001";
+          elsif (UP = '1') then Q <= Q + "00000001";
+          elsif (UP = '0') then Q <= Q - "00000001";
           end if;
       end if;
   end process;
 
-  EN_DL <= '1';
-  EN_DH <= '0';
   DOUTL <= Q;
   EN_DL <= '0';
 
