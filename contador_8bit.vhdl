@@ -1,10 +1,11 @@
 library ieee;
 use ieee.std_logic_1164.all;
---use ieee.numeric_std.all;
-use ieee.std_logic_arith.all;
+use ieee.numeric_std.all;
+--use ieee.std_logic_arith.all;
 --use ieee.std_logic_unsigned.all;
 
 entity Contador8 is
+    -- Barramento ISA:
     port (
         DINL: in STD_LOGIC_VECTOR (7 downto 0);
         DINH: in STD_LOGIC_VECTOR (15 downto 8);
@@ -37,7 +38,7 @@ end Contador8;
 
 architecture comportamento of Contador8 is
     --signal BASE, EN_BUF: std_logic;
-    signal UP, LOAD, CLR, EN: std_logic;
+    signal UP, LOAD, CLR, EN, CLOCK_CONT: std_logic;
     signal Q: std_logic_vector (7 downto 0);
 begin
   -- XXX: Não apagar apartir daqui.
@@ -50,7 +51,9 @@ begin
   IRQ5 <= '0';
   P57 <= '0';
   -- XXX: pode apagar abaixo.
-  EN_DL <= '1';
+
+  EN_DL <= not IOR and EN;
+  DOUTL <= Q;
 
   -- endereços:
   -- 0x300 (up)
@@ -60,28 +63,25 @@ begin
   UP <= (not A(0));
   LOAD <= A(1);
   CLR <= A(2);
-  EN <= (not A(3)) and (not A(4)) and (not A(5)) and (not A(6)) and (not A(7)) and A(8) and A(9);
+  EN <= (not AEN) and ((not A(3)) and (not A(4)) and (not A(5)) and (not A(6)) and (not A(7)) and A(8) and A(9));
+  CLOCK_CONT <= (EN and not IOR) or (EN and not IOW);
 
-  process (CLK8M)
+  process (CLOCK_CONT)
   begin
-      if (CLK8M'event and CLK8M = '1' and EN = '1') then
-          if (LOAD = '0') then Q <= DINL;
-          elsif (CLR = '0') then Q <= "00000000";
+      if (CLOCK_CONT'event and CLOCK_CONT = '0') then
+          if (LOAD = '1') then Q <= DINL;
+          elsif (CLR = '1') then Q <= "00000000";
           elsif (UP = '1') then Q <= Q + "00000001";
-          elsif (UP = '0') then Q <= Q - "00000001";
+          else Q <= Q - "00000001";
           end if;
       end if;
   end process;
-
-  DOUTL <= Q;
-  EN_DL <= '0';
 
   -- o seguinte serviria para castacear contadores
   --RCO_UP <= Q(3) and Q(2) and Q(1) and Q(0) and UP;
   --RCO_DOWN <= (not Q(3)) and (not Q(2)) and (not Q(1)) and (not Q(0)) and (not UP);
   --RCO <= RCO_UP nor RCO_DOWN;
 
-  --EN_DH <= '0';
   --EN_DL <= '0';
 end comportamento;
 
