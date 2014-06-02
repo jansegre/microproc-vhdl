@@ -1,127 +1,93 @@
-library IEEE;
-use IEEE.std_logic_1164.all;
+library ieee;
 use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 
 
-entity CXPRETA is
+entity BarramentoISA is
+    -- Barramento ISA:
     port (
-             CLK : in std_logic;
-             EOC : in std_logic;
-             BD : in std_logic_vector(7 downto 0); 
-             CHAVES : in std_logic_vector(3 downto 0);
-             CLKAD : out std_logic;
-             ADR : out std_logic_vector(2 downto 0);
-             OEAD : out std_logic;
-             SOC : out std_logic;
-             SEGMENTOS : out std_logic_vector(6 downto 0);
-             LEDS : out std_logic_vector(3 downto 0);
-             ANODOS : out std_logic_vector(3 downto 0)
-         );
-end CXPRETA;
+        DINL: in STD_LOGIC_VECTOR (7 downto 0);
+        DINH: in STD_LOGIC_VECTOR (15 downto 8);
+        DOUTL: out STD_LOGIC_VECTOR (7 downto 0);
+        DOUTH: out STD_LOGIC_VECTOR (15 downto 8);
+        A: in STD_LOGIC_VECTOR (9 downto 0);
+        BHE: in STD_LOGIC;
+        IOW: in STD_LOGIC;
+        IOR: in STD_LOGIC;
+        EN_DL: out STD_LOGIC;
+        EN_DH: out STD_LOGIC;
+        CLK8M: in STD_LOGIC;
+        CH: in STD_LOGIC_VECTOR (3 downto 0);
+        AEN: in STD_LOGIC;
+        IRQ5: out STD_LOGIC;
+        CLK_AD: out STD_LOGIC;
+        OE_AD: out STD_LOGIC;
+        EOC_AD: in STD_LOGIC;
+        SOC_AD: out STD_LOGIC;
+        ADR_AD: out STD_LOGIC_VECTOR (2 downto 0);
+        CLK_DA: out STD_LOGIC;
+        P51: out STD_LOGIC;
+        P56: in STD_LOGIC;
+        P57: in STD_LOGIC;
+        IOCS16: out STD_LOGIC;
+        IOCHRDY: out STD_LOGIC
+    );
+end BarramentoISA;
 
-architecture CXPRETA_arch of CXPRETA is
-
-    signal aux: std_logic_vector(3 downto 0);
-    signal aux2: std_logic_vector(15 downto 0);
-    signal aux_ADR: std_logic_vector(2 downto 0);
-    signal aux_BD: std_logic_vector(7 downto 0);
-    signal aux3: std_logic_vector(7 downto 0);
-    signal count: std_logic_vector(25 downto 0);
-    signal CLK2 : std_logic;
-    signal atual, prox: std_logic_vector(2 downto 0);
-
-
-
+architecture MouseWii of BarramentoISA is
+    signal BASE, ENX, CLOCK_CONT: std_logic;
+    signal CONTX, CONTY: std_logic_vector(16 downto 0);
+    signal REGX, REGY: std_logic_vector(7 downto 0);
 begin
+    IRQ5 <= P56;
 
-    process(CLK)
+    EN_DL <= not IOR and BASE;
+
+    -- endereços:
+    -- 0x300 (mousex)
+    -- 0x301 (mousey)
+    ENX <= (not A(0));
+    BASE <= (not AEN) and ((not A(1)) and (not A(2)) and (not A(3)) and (not A(4)) and (not A(5)) and (not A(6)) and (not A(7)) and A(8) and A(9));
+    CLOCK_CONT <= (BASE and not IOR) or (BASE and not IOW);
+
+    -- pulso de leitura em borda de descida
+    process (CLOCK_CONT)
     begin
-        if (CLK'event and CLK = '1') then
-            if (count = "11111111111111111111111111") 
-            then count <= "00000000000000000000000000";
-        else count <= count + "00000000000000000000000001";
+        if (CLOCK_CONT'event and CLOCK_CONT = '0') then
+            if (ENX = '1') then
+                DOUTL <= REGX;
+            else
+                DOUTL <= REGY;
+            end if;
         end if;
-    end if;
-end process;
+    end process;
 
+    -- borda de subida do clock de 8MHZ
+    process(CLK8M)
+    begin
+        if (CLK8M'event and CLK8M = '1')
+        then
+            if (P56 = '1') then CONTX <= CONTX + "00000000000000001"; else CONTX <= "00000000000000000"; end if;
+            if (P57 = '1') then CONTY <= CONTY + "00000000000000001"; else CONTY <= "00000000000000000"; end if;
+        end if;
+    end process;
 
-ANODOS <= "1000" when count(17 downto 16) = "00" else
-          "0100" when count(17 downto 16) = "01" else
-          "0010" when count(17 downto 16) = "10" else
-          "0001";
+    -- borda de descida de X
+    process (P56)
+    begin
+        if (P56'event and P56 = '0') then
+            REGX <= CONTX (16 downto 9);
+        end if;
+    end process;
 
+    -- borda de descida de Y
+    process (P57)
+    begin
+        if (P57'event and P57 = '0') then
+            REGY <= CONTY (16 downto 9);
+        end if;
+    end process;
 
-aux3 <= BD - "00111101" when atual = "101" else aux3;
-
-aux_BD <= (aux3(5 downto 0) & "00") + ('0' & aux3(7 downto 1));
-
-
-aux2(15 downto 12) <= "0000";
-aux2(11 downto 8) <= aux_BD(7 downto 4) when aux_ADR = "000" else
-aux2(11 downto 8);
-aux2(7 downto 4) <= aux_BD(7 downto 4) when aux_ADR = "001" else
-aux2(7 downto 4);
-aux2(3 downto 0) <= aux_BD(7 downto 4) when aux_ADR = "010" else
-aux2(3 downto 0);						 
-
-aux <= aux2(15 downto 12) when count(17 downto 16) = "00" else
-       aux2(11 downto 8) when count(17 downto 16) = "01" else
-       aux2(7 downto 4) when count(17 downto 16) = "10" else
-       aux2(3 downto 0);
-
-SEGMENTOS <= "0000001" when aux = "0000" else --0
-             "1001111" when aux = "0001" else --1
-             "0010010" when aux = "0010" else --2
-             "0000110" when aux = "0011" else --3
-             "1001100" when aux = "0100" else --4
-             "0100100" when aux = "0101" else --5
-             "0100000" when aux = "0110" else --6
-             "0001111" when aux = "0111" else --7
-             "0000000" when aux = "1000" else --8
-             "0000100" when aux = "1001" else --9
-             "0001000" when aux = "1010" else --A
-             "1100000" when aux = "1011" else --b
-             "0110001" when aux = "1100" else --c
-             "1000010" when aux = "1101" else --d
-             "0110000" when aux = "1110" else --e
-             "0111000"; --  f
-
-
-CLK2 <= count(4);
-CLKAD <= CLK2;
-
-process(CLK2)
-begin
-    if (CLK2'event and CLK2 = '1') then
-        atual <= prox;
-    end if;
-end process;
-
-prox <= "001" when atual = "000" else
-        "001" when (atual = "001" and EOC = '1') else
-        "011" when (atual = "001" and EOC = '0') else
-        "011" when (atual = "011" and EOC = '0') else
-        "111" when (atual = "011" and EOC = '1') else
-        "101" when atual = "111" else
-        "100" when atual = "101" else
-        "000";
-
-aux_ADR <= aux_ADR + "001" when prox = "000" else
-               --"000" when aux_ADR = "011" else 
-           aux_ADR;	   
-
-
-SOC <= '1' when atual = "000" else '0';
-
-OEAD <= '1' when (atual = "111" or atual = "101") else '0';
-
-ADR <= "000" when aux_ADR = "000" or aux_ADR = "011" or aux_ADR = "110" else
-       "001" when aux_ADR = "001" or aux_ADR = "100" or aux_ADR = "111" else
-       "010";
-
-LEDS <= '0' & atual;
-
-end CXPRETA_arch;
+end MouseWii;
 
 -- vim: et sw=4 ts=4 sts=4
